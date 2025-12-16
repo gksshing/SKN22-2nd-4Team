@@ -1,19 +1,19 @@
 Model: CatBoost
-Best Params: {'bagging_temperature': 0.5142344384136116, 'depth': 8, 'colsample_bylevel': 0.5232252063599989}
-Best CV F1: 0.8500731638959458
-Optimal Threshold: 0.3
-Validation F1 (Optimized): 0.8648648648648649
+Best Params: {'bagging_temperature': 0.3745401188473625, 'depth': 10, 'colsample_bylevel': 0.8659969709057025}
+Best CV F1: 0.8466291562843287
+Optimal Threshold: 0.33
+Validation F1 (Optimized): 0.8738738738738738
 
 Confusion Matrix:
-[[724   6]
- [ 24  96]]
+[[725   5]
+ [ 23  97]]
 
 Classification Report:
               precision    recall  f1-score   support
 
            0       0.97      0.99      0.98       730
-           1       0.94      0.80      0.86       120
+           1       0.95      0.81      0.87       120
 
-    accuracy                           0.96       850
-   macro avg       0.95      0.90      0.92       850
-weighted avg       0.96      0.96      0.96       850
+    accuracy                           0.97       850
+   macro avg       0.96      0.90      0.93       850
+weighted avg       0.97      0.97      0.97       850

@@ -11,7 +11,7 @@ from sklearn.metrics import f1_score, roc_auc_score, classification_report, conf
 from optuna.samplers import TPESampler
 from optuna.pruners import HyperbandPruner
 
-# --- 설정 ---
+# --- 설정 (Configuration) ---
 RAW_DATA_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\01_raw' # 경로 확인!
 OUTPUT_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\05_optimized'
 RANDOM_STATE = 42
@@ -19,6 +19,7 @@ N_TRIALS = 1
 
 def load_and_split_data():
     """
+    데이터를 로드하고 전처리 및 분할을 수행하는 함수입니다.
     Test 파일에 정답(churn)이 없으므로,
     Train 데이터를 쪼개서 학습용(Train)과 검증용(Val)으로 나눕니다.
     """
@@ -54,6 +55,9 @@ def load_and_split_data():
     return X_train, y_train, X_val, y_val, df_submission
 
 def find_optimal_threshold(y_true, y_prob):
+    """
+    F1 Score를 최대화하는 최적의 임계값(Threshold)을 찾습니다.
+    """
     best_threshold = 0.5
     best_f1 = 0.0
     thresholds = np.arange(0.01, 1.00, 0.01)
@@ -97,30 +101,38 @@ class ModelOptimizer:
             
         return scores.mean()
 
-def run_optimization():
+def get_trained_model():
+    """
+    전체 학습 파이프라인을 실행하고 학습된 모델을 반환하는 함수입니다.
+    외부(예: app.py)에서 호출하여 모델을 가져갈 수 있습니다.
+    
+    Returns:
+        final_model: 학습이 완료된 CatBoost 모델 객체
+        feature_names: 학습에 사용된 컬럼명 리스트 (X_train.columns)
+    """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    print("Loading Data & Splitting (Train/Val)...")
+    print("데이터 로딩 및 분할 (Train/Val)...")
     # submission 데이터는 정답이 없으므로 X_submission 변수에 따로 저장
     X_train, y_train, X_val, y_val, df_submission = load_and_split_data()
     
     # CatBoost용 범주형 변수 감지
     cat_features = X_train.select_dtypes(include=['object']).columns.tolist()
-    print(f"Detected Categorical Features: {cat_features}")
+    print(f"감지된 범주형 변수: {cat_features}")
     
     print(f"\n{'='*40}")
-    print(f"Optimizing CatBoost (Trials: {N_TRIALS})...")
+    print(f"CatBoost 최적화 진행 (Trials: {N_TRIALS})...")
     print(f"{'='*40}")
     
     optimizer = ModelOptimizer(X_train, y_train, cat_features)
     study = optuna.create_study(direction='maximize', sampler=TPESampler(seed=RANDOM_STATE))
     study.optimize(optimizer.objective, n_trials=N_TRIALS, show_progress_bar=True)
     
-    print(f"Best CV F1: {study.best_value:.4f}")
-    print("Best Params:", study.best_params)
+    print(f"최고 CV F1 점수: {study.best_value:.4f}")
+    print("최적 파라미터:", study.best_params)
     
     # --- 최종 검증 (Validation Set) ---
-    print(f"\nTraining Final Model & Evaluating on Validation Set...")
+    print(f"\n최종 모델 학습 및 검증 데이터 평가 중...")
     
     final_model = CatBoostClassifier(
         boosting_type='Ordered', bootstrap_type='Bayesian', 
@@ -142,14 +154,13 @@ def run_optimization():
     y_pred_val = (y_prob_val >= best_thresh).astype(int)
     
     # 리포트 출력
-    print("\n--- Validation Report (Internal Check) ---")
-    print(f"Best Threshold: {best_thresh:.2f}")
-    # [수정] 순서 정확하게 (정답, 예측값)
+    print("\n--- 검증 리포트 (내부 확인용) ---")
+    print(f"최적 임계값: {best_thresh:.2f}")
     print(confusion_matrix(y_val, y_pred_val))
     report = classification_report(y_val, y_pred_val)
     print(report)
     
-    # Save Report
+    # 결과 저장
     result_text = (
         f"Model: CatBoost\n"
         f"Best Params: {study.best_params}\n"
@@ -163,8 +174,13 @@ def run_optimization():
     save_path = os.path.join(OUTPUT_DIR, "catboost_optimization_report.txt")
     with open(save_path, "w") as f:
         f.write(result_text)
-    print(f"Results saved to {save_path}")
-
+    print(f"결과가 저장되었습니다: {save_path}")
+    
+    # 모델과 컬럼명 리스트 반환
+    return final_model, X_train.columns
 
 if __name__ == "__main__":
-    run_optimization()
+    # 이 파일을 직접 실행할 경우에만 학습 로직이 돌아갑니다.
+    model, features = get_trained_model()
+    print("\n학습 완료 확인.")
+    print("입력 변수 목록:", list(features))
