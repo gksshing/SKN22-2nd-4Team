@@ -157,10 +157,10 @@ if df is not None and model is not None:
     
     kpi1.metric("총 관리 고객", f"{total_customers:,}명")
     kpi2.metric("집중 관리 대상 (Warning+)", f"{warning_customers:,}명", delta="요주의")
-    kpi3.metric("총 기대 손실액", f"${total_revenue_at_risk:,.0f}")
+    kpi3.metric("총 기대 손실액", f"€{total_revenue_at_risk:,.0f}")
     kpi4.metric(
         "캠페인 방어 효과 (ROI)", 
-        f"${saved_revenue:,.0f}", 
+        f"€{saved_revenue:,.0f}", 
         delta=f"이탈률 -{improvement_rate}% 가정"
     )
     
@@ -186,15 +186,74 @@ if df is not None and model is not None:
         
     with c2:
         st.subheader("주요 이탈 원인/전략 분포")
-        # '일반 유지 관리'는 제외하고 시각화
-        strategy_counts = df['Strategy'].value_counts().drop('일반 유지 관리', errors='ignore')
-        fig_bar = px.bar(
-            x=strategy_counts.index, 
-            y=strategy_counts.values,
-            color=strategy_counts.index,
-            labels={'x': '전략 유형', 'y': '대상 고객 수'}
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        
+        # 탭 구성: 고객 수 vs 금액(Risk Value)
+        tab1, tab2 = st.tabs(["👥 대상 고객 수", "💰 전략별 기대 손실액"])
+        
+        # 공통 필터: '일반 유지 관리' 제외
+        chart_df = df[df['Strategy'] != '일반 유지 관리']
+        
+        # --- Tab 1: 기존 카운트 차트 ---
+        with tab1:
+            strategy_counts = chart_df['Strategy'].value_counts()
+            fig_bar = px.bar(
+                x=strategy_counts.index, 
+                y=strategy_counts.values,
+                color=strategy_counts.index,
+                labels={'x': '전략 유형', 'y': '대상 고객 수'}
+            )
+            # 탭 내부 차트 높이 등 조정 가능
+            st.plotly_chart(fig_bar, use_container_width=True)
+            
+        # --- Tab 2: 기대 손실액 (Stacked by Risk Level) ---
+        with tab2:
+            # 전략 및 위험 등급별로 그룹화하여 합계 계산
+            risk_agg = chart_df.groupby(['Strategy', 'Risk Level'], as_index=False)['risk_value'].sum()
+            
+            # Risk Level 순서 정렬 (Critical이 위로 오거나 강조되도록)
+            risk_order = ['Safe', 'Attention', 'Warning', 'Critical']
+            
+            fig_revenue = px.bar(
+                risk_agg,
+                x='Strategy',
+                y='risk_value',
+                color='Risk Level',
+                category_orders={'Risk Level': risk_order}, # 범례 순서 고정
+                color_discrete_map={
+                    'Safe': '#66bb6a', 'Attention': '#2196f3', 
+                    'Warning': '#ffa726', 'Critical': '#ff4b4b'
+                },
+                labels={'risk_value': '기대 손실액 (€)', 'Strategy': '전략 유형'}
+            )
+            
+            # 포맷팅 및 디자인 개선
+            fig_revenue.update_traces(hovertemplate='%{y:€,.0f}') # 툴팁: €표시 및 천단위 콤마, 소수점 제거
+            
+            # 총합 텍스트 추가를 위한 데이터 계산
+            total_rev = chart_df.groupby('Strategy', as_index=False)['risk_value'].sum()
+            
+            # Scatter Trace로 텍스트 추가 (Stacked Bar 위에 표시)
+            fig_revenue.add_trace(
+                go.Scatter(
+                    x=total_rev['Strategy'], 
+                    y=total_rev['risk_value'],
+                    text=total_rev['risk_value'],
+                    mode='text',
+                    texttemplate='%{text:€,.0f}', # 텍스트 포맷: €1,234
+                    textposition='top center',
+                    showlegend=False,
+                    hoverinfo='skip'
+                )
+            )
+
+            fig_revenue.update_layout(
+                yaxis_tickformat='€2s',   # 축 단위 표시 (K, M)
+                xaxis={'categoryorder':'total descending'}, # 1. 막대 정렬: 총합 기준 내림차순
+                bargap=0.4, # 2. 디자인: 막대 두께를 얇게
+                margin=dict(t=50) # 상단 여백 확보 (텍스트 잘림 방지)
+            )
+            
+            st.plotly_chart(fig_revenue, use_container_width=True)
         
     st.markdown("---")
     
@@ -281,11 +340,11 @@ if df is not None and model is not None:
             ),
             "total_bill": st.column_config.NumberColumn(
                 "월 요금",
-                format="$%.2f"
+                format="€%.2f"
             ),
             "risk_value": st.column_config.NumberColumn(
                 "기대 손실액 (Risk Value)",
-                format="$%.2f"
+                format="€%.2f"
             ),
             "Strategy": "추천 전략"
         },
