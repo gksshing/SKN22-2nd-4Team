@@ -1,17 +1,17 @@
 Model: XGBoost
-Dataset: smote_enn
-Best Params: {'lambda': 0.0010521761868451127, 'alpha': 1.8274508859816028, 'subsample': 0.8534286719238086, 'colsample_bytree': 0.8645035840204937, 'max_depth': 9, 'min_child_weight': 1, 'eta': 0.0338452204120114, 'gamma': 0.5793452976256486}
-Best Validation F1: 0.9464722213554394
-Test ROC AUC: 0.9061841038118409
-Optimal Threshold: 0.78
-Test F1 (Optimized): 0.7810650887573964
+Dataset: original
+Best Params: {'lambda': 0.06672367170464207, 'alpha': 1.382623217936987, 'subsample': 0.5998368910791798, 'colsample_bytree': 0.7571172192068059, 'max_depth': 7, 'min_child_weight': 1, 'eta': 0.07896186801026692, 'gamma': 0.8526206184364576}
+Best Validation F1: 0.8288207818004288
+Test ROC AUC: 0.9075831305758312
+Optimal Threshold: 0.65
+Test F1 (Optimized): 0.8711656441717791
 
 Classification Report:
               precision    recall  f1-score   support
 
-         0.0       0.96      0.98      0.97       548
-         1.0       0.84      0.73      0.78        90
+         0.0       0.97      1.00      0.98       548
+         1.0       0.97      0.79      0.87        90
 
-    accuracy                           0.94       638
-   macro avg       0.90      0.85      0.87       638
-weighted avg       0.94      0.94      0.94       638
+    accuracy                           0.97       638
+   macro avg       0.97      0.89      0.93       638
+weighted avg       0.97      0.97      0.97       638

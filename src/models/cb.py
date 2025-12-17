@@ -12,47 +12,30 @@ from optuna.samplers import TPESampler
 from optuna.pruners import HyperbandPruner
 
 # --- 설정 (Configuration) ---
-RAW_DATA_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\01_raw' # 경로 확인!
+DATA_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\03_resampled'
 OUTPUT_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\05_optimized'
 RANDOM_STATE = 42
 N_TRIALS = 1 
 
-def load_and_split_data():
+def load_data():
     """
-    데이터를 로드하고 전처리 및 분할을 수행하는 함수입니다.
-    Test 파일에 정답(churn)이 없으므로,
-    Train 데이터를 쪼개서 학습용(Train)과 검증용(Val)으로 나눕니다.
+    저장된 Split 데이터를 로드합니다.
+    preprocess_and_split.py 에서 생성된 파일을 사용합니다.
     """
-    train_path = os.path.join(RAW_DATA_DIR, "train.csv")
-    test_path = os.path.join(RAW_DATA_DIR, "test.csv") # 제출용 데이터
+    train_x_path = os.path.join(DATA_DIR, "X_train_original.csv")
+    train_y_path = os.path.join(DATA_DIR, "y_train_original.csv")
+    test_x_path = os.path.join(DATA_DIR, "X_test.csv")
+    test_y_path = os.path.join(DATA_DIR, "y_test.csv")
     
-    # 1. 데이터 로드
-    df_train_full = pd.read_csv(train_path)
-    df_submission = pd.read_csv(test_path) # 정답 없음
+    print(f"데이터 로드 경로: {DATA_DIR}")
     
-    # 2. 전처리 (Yes/No -> 1/0 변환)
-    # 데이터 컬럼을 확인해서 object 타입인 'yes'/'no' 컬럼만 변환
-    target_cols = ['churn', 'international_plan', 'voice_mail_plan']
+    X_train = pd.read_csv(train_x_path)
+    y_train = pd.read_csv(train_y_path).values.ravel()
+    X_test = pd.read_csv(test_x_path)
+    y_test = pd.read_csv(test_y_path).values.ravel()
     
-    for col in target_cols:
-        # train 데이터 처리
-        if col in df_train_full.columns and df_train_full[col].dtype == 'object':
-            df_train_full[col] = (df_train_full[col] == 'yes').astype(int)
-        
-        # submission 데이터 처리 (churn은 없을 수 있음)
-        if col in df_submission.columns and df_submission[col].dtype == 'object':
-            df_submission[col] = (df_submission[col] == 'yes').astype(int)
-            
-    # 3. 학습용 데이터 분리
-    X = df_train_full.drop('churn', axis=1)
-    y = df_train_full['churn']
-    
-    # 자체 검증을 위해 8:2로 분할 (이게 중요!)
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
-    )
-    
-    return X_train, y_train, X_val, y_val, df_submission
+    return X_train, y_train, X_test, y_test
+
 
 def find_optimal_threshold(y_true, y_prob):
     """
@@ -112,9 +95,9 @@ def get_trained_model():
     """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
-    print("데이터 로딩 및 분할 (Train/Val)...")
+    print("데이터 로딩...")
     # submission 데이터는 정답이 없으므로 X_submission 변수에 따로 저장
-    X_train, y_train, X_val, y_val, df_submission = load_and_split_data()
+    X_train, y_train, X_test, y_test = load_data()
     
     # CatBoost용 범주형 변수 감지
     cat_features = X_train.select_dtypes(include=['object']).columns.tolist()
@@ -131,8 +114,8 @@ def get_trained_model():
     print(f"최고 CV F1 점수: {study.best_value:.4f}")
     print("최적 파라미터:", study.best_params)
     
-    # --- 최종 검증 (Validation Set) ---
-    print(f"\n최종 모델 학습 및 검증 데이터 평가 중...")
+    # --- 최종 검증 (Test Set) ---
+    print(f"\n최종 모델 학습 및 테스트 데이터 평가 중...")
     
     final_model = CatBoostClassifier(
         boosting_type='Ordered', bootstrap_type='Bayesian', 
@@ -146,28 +129,33 @@ def get_trained_model():
     # Train 데이터 전체로 학습
     final_model.fit(X_train, y_train)
     
-    # 1. 우리끼리 채점 (Validation Set)
-    y_prob_val = final_model.predict_proba(X_val)[:, 1]
+    # 1. Test Set 평가
+    y_prob_val = final_model.predict_proba(X_test)[:, 1]
     
     # 임계값 튜닝
-    best_thresh, best_f1_val = find_optimal_threshold(y_val, y_prob_val)
+    best_thresh, best_f1_val = find_optimal_threshold(y_test, y_prob_val)
     y_pred_val = (y_prob_val >= best_thresh).astype(int)
     
     # 리포트 출력
-    print("\n--- 검증 리포트 (내부 확인용) ---")
+    print("\n--- 최종 결과 리포트 (Test Set) ---")
     print(f"최적 임계값: {best_thresh:.2f}")
-    print(confusion_matrix(y_val, y_pred_val))
-    report = classification_report(y_val, y_pred_val)
+    print(confusion_matrix(y_test, y_pred_val))
+    report = classification_report(y_test, y_pred_val)
     print(report)
+    
+    # ROC AUC 계산
+    roc_auc = roc_auc_score(y_test, y_prob_val)
+    print(f"Test Set ROC AUC: {roc_auc:.4f}")
     
     # 결과 저장
     result_text = (
         f"Model: CatBoost\n"
         f"Best Params: {study.best_params}\n"
         f"Best CV F1: {study.best_value}\n"
+        f"Test ROC AUC: {roc_auc:.4f}\n" 
         f"Optimal Threshold: {best_thresh}\n"
-        f"Validation F1 (Optimized): {best_f1_val}\n\n"
-        f"Confusion Matrix:\n{confusion_matrix(y_val, y_pred_val)}\n\n"
+        f"Test F1 (Optimized): {best_f1_val}\n\n"
+        f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred_val)}\n\n"
         f"Classification Report:\n{report}"
     )
     

@@ -1,17 +1,17 @@
 Model: LightGBM
-Dataset: smote_enn
-Best Params: {'num_leaves': 56, 'max_depth': 8, 'lambda_l1': 0.0036618192203924276, 'lambda_l2': 1.6172900811143154, 'feature_fraction': 0.5372753218398854, 'bagging_fraction': 0.9934434683002586, 'bagging_freq': 6, 'min_child_samples': 24}
-Best Validation F1: 0.9445457146218419
-Test ROC AUC: 0.907948094079481
-Optimal Threshold: 0.81
-Test F1 (Optimized): 0.7719298245614035
+Dataset: original
+Best Params: {'num_leaves': 79, 'max_depth': 10, 'lambda_l1': 0.006290644294586149, 'lambda_l2': 0.11400863701127326, 'feature_fraction': 0.7962072844310213, 'bagging_fraction': 0.5232252063599989, 'bagging_freq': 5, 'min_child_samples': 21}
+Best Validation F1: 0.8154684095860567
+Test ROC AUC: 0.9120235198702351
+Optimal Threshold: 0.39
+Test F1 (Optimized): 0.8554216867469879
 
 Classification Report:
               precision    recall  f1-score   support
 
-         0.0       0.96      0.97      0.96       548
-         1.0       0.81      0.73      0.77        90
+         0.0       0.97      0.99      0.98       548
+         1.0       0.93      0.79      0.86        90
 
-    accuracy                           0.94       638
-   macro avg       0.89      0.85      0.87       638
-weighted avg       0.94      0.94      0.94       638
+    accuracy                           0.96       638
+   macro avg       0.95      0.89      0.92       638
+weighted avg       0.96      0.96      0.96       638

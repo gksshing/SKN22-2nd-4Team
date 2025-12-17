@@ -168,6 +168,18 @@ def main():
         print(f"WARNING: Data split shapes do NOT exact match (4250, 750). Received ({X_train.shape[0]}, {X_test.shape[0]}).")
         print("Reason: Provided test.csv likely lacked labels, reducing total usable dataset to 4250.")
 
+    # 6. Save Split Data
+    OUTPUT_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\03_resampled'
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    print(f"\nSaving split data to {OUTPUT_DIR}...")
+    X_train.to_csv(os.path.join(OUTPUT_DIR, 'X_train_original.csv'), index=False)
+    X_test.to_csv(os.path.join(OUTPUT_DIR, 'X_test.csv'), index=False)
+    y_train.to_csv(os.path.join(OUTPUT_DIR, 'y_train_original.csv'), index=False)
+    y_test.to_csv(os.path.join(OUTPUT_DIR, 'y_test.csv'), index=False)
+    print("Files saved: X_train_original.csv, X_test.csv, y_train_original.csv, y_test.csv")
+
+
 
     print("Preprocessing & Splitting Completed.")
 if __name__ == "__main__":

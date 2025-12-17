@@ -14,8 +14,8 @@ from optuna.pruners import HyperbandPruner
 DATA_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\03_resampled'
 OUTPUT_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\05_optimized'
 RANDOM_STATE = 42
-N_TRIALS = 10 # Reduced for feasibility (100 is too slow with Dart/Ordered boosters) 
-DATASET_NAME = 'smote_enn' # Best candidate from benchmark (or make configurable)
+N_TRIALS = 10 
+DATASET_NAME = 'original'
 
 def load_data(dataset_name):
     train_x_path = os.path.join(DATA_DIR, f"X_train_{dataset_name.lower()}.csv")
@@ -50,6 +50,12 @@ class ModelOptimizer:
         self.y_train = y_train
         self.model_name = model_name
         
+        # Calculate scale_pos_weight for XGBoost (Neg/Pos ratio)
+        # Using simple integer counts
+        n_pos = sum(y_train)
+        n_neg = len(y_train) - n_pos
+        self.scale_pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
+        
     def objective(self, trial):
         cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=RANDOM_STATE)
         
@@ -60,6 +66,7 @@ class ModelOptimizer:
                 'n_estimators': 200,
                 'eval_metric': 'logloss', # Fixed
                 'random_state': RANDOM_STATE,
+                'scale_pos_weight': self.scale_pos_weight, # Handle Imbalance
                 'lambda': trial.suggest_float('lambda', 1e-3, 10.0, log=True),
                 'alpha': trial.suggest_float('alpha', 1e-3, 10.0, log=True),
                 'subsample': trial.suggest_float('subsample', 0.5, 1.0),
@@ -78,6 +85,7 @@ class ModelOptimizer:
                 'n_estimators': 200,
                 'random_state': RANDOM_STATE,
                 'verbose': -1,
+                'class_weight': 'balanced', # Handle Imbalance
                 'num_leaves': trial.suggest_int('num_leaves', 20, 150),
                 'max_depth': trial.suggest_int('max_depth', 3, 12),
                 'lambda_l1': trial.suggest_float('lambda_l1', 1e-3, 10.0, log=True),
@@ -110,6 +118,11 @@ def run_optimization():
     print(f"Loading Dataset: {DATASET_NAME}")
     X_train, y_train, X_test, y_test = load_data(DATASET_NAME)
     
+    # Calc ratio for final model
+    n_pos = sum(y_train)
+    n_neg = len(y_train) - n_pos
+    scale_pos_weight = n_neg / n_pos if n_pos > 0 else 1.0
+    
     models_to_tune = ['XGBoost','LightGBM']
     best_results = {}
     
@@ -141,11 +154,11 @@ def run_optimization():
         if model_name == 'XGBoost':
             final_model = XGBClassifier(
                 booster='dart', grow_policy='depthwise', n_estimators=1000, eval_metric='logloss',
-                random_state=RANDOM_STATE, use_label_encoder=False, **best_params
+                random_state=RANDOM_STATE, use_label_encoder=False, scale_pos_weight=scale_pos_weight, **best_params
             )
         elif model_name == 'LightGBM':
             final_model = LGBMClassifier(
-                boosting_type='dart', n_estimators=1000, random_state=RANDOM_STATE, verbose=-1, **best_params
+                boosting_type='dart', n_estimators=1000, random_state=RANDOM_STATE, verbose=-1, class_weight='balanced', **best_params
             )
             
         final_model.fit(X_train, y_train)
