@@ -186,7 +186,8 @@ if df is not None and model is not None:
         
     with c2:
         st.subheader("주요 이탈 원인/전략 분포")
-        strategy_counts = df['Strategy'].value_counts()
+        # '일반 유지 관리'는 제외하고 시각화
+        strategy_counts = df['Strategy'].value_counts().drop('일반 유지 관리', errors='ignore')
         fig_bar = px.bar(
             x=strategy_counts.index, 
             y=strategy_counts.values,
