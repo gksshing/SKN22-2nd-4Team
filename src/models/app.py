@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from cb import get_trained_model
+import os
+import pickle
+from catboost import CatBoostClassifier
 
 # --- 1. 페이지 설정 및 모델 로드 ---
 st.set_page_config(
@@ -15,14 +17,32 @@ st.set_page_config(
 st.title("📊 고객 이탈 예측 시스템 (Churn Prediction)")
 st.markdown("---")
 
-# 모델 로드 (캐싱 사용)
+# 경로 설정
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(CURRENT_DIR, "churn_model.cbm")
+FEATURES_PATH = os.path.join(CURRENT_DIR, "features.pkl")
+
+# 모델 및 데이터 로드 (캐싱 사용)
 @st.cache_resource
-def load_model():
-    return get_trained_model()
+def load_model_and_features():
+    # 1. 모델 로드
+    model = CatBoostClassifier()
+    model.load_model(MODEL_PATH)
+    
+    # 2. Feature Names 로드
+    with open(FEATURES_PATH, 'rb') as f:
+        feature_names = pickle.load(f)
+        
+    return model, feature_names
 
 # 로딩 중 표시
-with st.spinner("모델을 학습 및 로딩 중입니다... (최초 1회 실행)"):
-    model, feature_names = load_model()
+with st.spinner("모델 및 데이터를 로딩 중입니다..."):
+    # 파일 존재 여부 확인
+    if not os.path.exists(MODEL_PATH) or not os.path.exists(FEATURES_PATH):
+        st.error("모델 파일 또는 피처 파일이 없습니다. 'save_model.py'를 먼저 실행해주세요.")
+        st.stop()
+        
+    model, feature_names = load_model_and_features()
 
 # --- 2. 사이드바: 사용자 입력 (User Input) ---
 st.sidebar.header("📝 고객 정보 입력")
@@ -30,31 +50,16 @@ st.sidebar.header("📝 고객 정보 입력")
 # 입력값을 저장할 딕셔너리
 user_input = {}
 
-# Feature 그룹핑 (편의상 도메인 지식 기반으로 나눔)
-# 실제 컬럼명: ['account_length', 'area_code', 'international_plan', 'voice_mail_plan',
-# 'number_vmail_messages', 'total_day_minutes', 'total_day_calls', 'total_day_charge',
-# 'total_eve_minutes', 'total_eve_calls', 'total_eve_charge', 'total_night_minutes',
-# 'total_night_calls', 'total_night_charge', 'total_intl_minutes', 'total_intl_calls',
-# 'total_intl_charge', 'number_customer_service_calls', 'state', 'voice_mail_messages'] 
-# (정확한 컬럼 목록은 실행 시 확인되지만, 일반적인 데이터를 가정하고 포괄적으로 구현)
-
 # 그룹 1: 기본 가입 정보 (Demographics & Plans)
 with st.sidebar.expander("👤 기본 가입 정보", expanded=True):
-    # state는 범주형이지만 너무 많으므로 예시로 텍스트 입력 혹은 선택 (여기선 간단히 숫자나 문자로 가정)
-    # 실제 모델 학습 시 encoding 되었을 수 있으므로 주의. CatBoost는 string 그대로 처리 가능.
-    # 안전을 위해 list에 있는 것 중 선택하게 하거나, 디폴트 값 제공
-    
-    # State 선택 (간단히 일부만 예시로 제공하거나, 전체 리스트가 있다면 좋음)
+    # State 선택
     state_options = ['KS', 'OH', 'NJ', 'OK', 'AL', 'MA', 'MO', 'LA', 'WV', 'IN'] # 예시
     user_input['state'] = st.selectbox("State (주)", state_options)
     
     user_input['account_length'] = st.number_input("가입 기간 (일)", min_value=1, value=100)
     user_input['area_code'] = st.selectbox("지역 코드 (Area Code)", ["area_code_408", "area_code_415", "area_code_510"])
     
-    # Yes/No 입력 (모델 학습시 1/0으로 변환됨, CatBoost 로직에 따라 맞춰줘야 함)
-    # cb.py에서 1/0으로 변환해서 학습했으므로 여기서도 1/0 혹은 'yes'/'no' -> 전처리 필요
-    # cb.py의 전처리 로직: 'yes' -> 1, 'no' -> 0. (train data)
-    # 사용자가 입력할 때는 보기 좋게 Yes/No로 받고, 나중에 변환
+    # Yes/No 입력 -> 1/0 변환
     intl_plan = st.radio("국제전화 플랜 가입", ["Yes", "No"])
     user_input['international_plan'] = 1 if intl_plan == "Yes" else 0
     
@@ -91,17 +96,17 @@ with st.sidebar.expander("🎧 고객 서비스 (CS)", expanded=False):
 
 
 # 입력 데이터를 DataFrame으로 변환
-# 주의: 학습 시 feature 순서와 일치해야 함
 input_df = pd.DataFrame([user_input])
 
-# 누락된 컬럼 처리 (혹시 모를 에러 방지)
-# 학습된 모델의 feature list에 있는 컬럼만 남기고 순서 맞춤
-# 만약 input에 없는 컬럼이 있다면 기본값(0) 등으로 채움
+# 중요: 학습된 모델의 Feature 순서와 동일하게 정렬
+# 없는 컬럼은 0으로 채우고, 불필요한 컬럼은 제거
+# (현재 예시 UI에서는 모든 피처를 다 받지 않았을 수 있으므로 안전장치 추가)
 for col in feature_names:
     if col not in input_df.columns:
-        input_df[col] = 0 # 혹은 적절한 기본값
+        # UI에서 입력받지 않은 값이 있다면 기본값 0 처리 (혹은 적절한 값)
+        input_df[col] = 0
 
-# 모델 학습 시 사용된 컬럼 순서대로 재정렬
+# 최종적으로 Feature Names 순서대로 정렬
 input_df = input_df[feature_names]
 
 
@@ -179,9 +184,6 @@ st.markdown("---")
 st.header("🤔 What-If 시뮬레이터")
 st.markdown("특정 변수를 변화시켰을 때 이탈 확률이 어떻게 변하는지 확인해보세요.")
 
-# 시뮬레이션 대상 변수 선택 (가장 영향력 있는 TOP 3 중 하나 선택 or 사용자가 선택)
-# 여기서는 예시로 'International Plan'과 'Customer Service Calls'를 실험 대상으로 함
-
 sim_col1, sim_col2 = st.columns(2)
 
 with sim_col1:
@@ -203,7 +205,7 @@ with sim_col1:
         label="예상 이탈 확률", 
         value=f"{sim_prob:.2f}%", 
         delta=f"{delta:.2f}%p",
-        delta_color="inverse" # 확률이 높으면 나쁜 거니까 색상 반전
+        delta_color="inverse"
     )
 
 with sim_col2:
@@ -229,4 +231,3 @@ with sim_col2:
         )
     else:
         st.info("버튼을 눌러 시뮬레이션을 실행해보세요.")
-
