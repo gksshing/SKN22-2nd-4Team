@@ -25,21 +25,18 @@ def load_data():
         df['voice_mail_plan'] = (df['voice_mail_plan'] == 'yes').astype(int)
     if 'churn' in df.columns:
         df['churn'] = (df['churn'] == 'yes').astype(int)
-    if 'total_bill' not in df.columns:
-        df['total_bill'] = (df['total_day_charge'] + df['total_eve_charge'] + df['total_night_charge'] + df['total_intl_charge'])
     return df
 
 def ppt_visualizations():
     df = load_data()
     # 1. 🚨 VIP 전담 케어 (최우선 순위)
     # 4. 💰 요금 할인 쿠폰 발송 (가격 민감군)
-    q1 = df['total_bill'].quantile(0.1)
-    q2 = df['total_bill'].quantile(0.4)
-    q3 = df['total_bill'].quantile(0.7)
+    q2 = df['total_day_charge'].quantile(0.4)
+    q3 = df['total_day_charge'].quantile(0.7)
     
     df['bill_group'] = pd.cut(
-    df['total_bill'],
-    bins=[0, q1, q2, q3, 10000],
+    df['total_day_charge'],
+    bins=[0, q2, q3, 10000],
     labels=['~100%', '~90%', '~60%','~30%'],
     right=True, 
     )
@@ -49,12 +46,12 @@ def ppt_visualizations():
     bill_df.values
     x = bill_df.index       
     y = bill_df.values      
-    color = ['lightgray','lightgray','lightgray','firebrick']
+    color = ['lightgray','lightgray','firebrick']
 
     plt.bar(x, y, color=color, width=0.6)
-    plt.xlabel('Total_Bill(%)')
-    plt.ylabel('Churn Rate')
-    plt.title('Churn Rate by bill_group')
+    plt.xlabel('[국내] 낮 통신요금 상위(%)')
+    plt.ylabel('이탈률')
+    plt.title('Churn Rate by Day_bill_group')
     plt.show()
 
     # 2. 📞 불만 전담 마크 (고객 케어)
@@ -75,15 +72,22 @@ def ppt_visualizations():
 
 
     # 3. 🌍 국제전화 요금제 제안:
-    df['intl_charge_group'] = pd.cut(
-        df['total_intl_charge'],
-        bins=[0, 1.2, 2.4, 3.6, 4.5, 6],
+    df2 = df[df['international_plan']==1].copy()
+     
+    q1 = df2['total_intl_charge'].quantile(0.8)
+    q2 = df2['total_intl_charge'].quantile(0.6)
+    q3 = df2['total_intl_charge'].quantile(0.4)
+    q4 = df2['total_intl_charge'].quantile(0.2)
+
+    df2['intl_charge_group'] = pd.cut(
+        df2['total_intl_charge'],
+        bins=[0, q4, q3, q2, q1, 6],
         labels=['~100%', '~80%', '~60%','~40%','~20%'],
         right=True, 
     )
+
     intl_df = df.groupby('intl_charge_group', observed=False)['churn'].mean()
 
-    intl_df.values
     x = intl_df.index       
     y = intl_df.values      
     color = ['lightgray','lightgray','lightgray','lightgray','firebrick']
@@ -93,6 +97,7 @@ def ppt_visualizations():
     plt.ylabel('Churn Rate')
     plt.title('Churn Rate by intl_charge_group')
     plt.show()
+   
         
 
 
