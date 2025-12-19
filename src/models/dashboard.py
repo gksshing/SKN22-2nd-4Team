@@ -6,6 +6,7 @@ import os
 from catboost import CatBoostClassifier
 import plotly.express as px
 import plotly.graph_objects as go
+import yfinance as yf
 
 # --- 1. 설정 및 데이터 로드 ---
 st.set_page_config(page_title="고객 이탈 관리 대시보드", layout="wide", page_icon="📊")
