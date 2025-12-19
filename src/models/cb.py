@@ -12,27 +12,35 @@ from optuna.samplers import TPESampler
 from optuna.pruners import HyperbandPruner
 
 # --- 설정 (Configuration) ---
-DATA_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\03_resampled'
+DATA_PATH = r'c:\Workspaces\SKN22-2nd-4Team\data\01_raw\train.csv'
 OUTPUT_DIR = r'c:\Workspaces\SKN22-2nd-4Team\data\05_optimized'
 RANDOM_STATE = 42
-N_TRIALS = 1 
+N_TRIALS = 10 
 
 def load_data():
     """
-    저장된 Split 데이터를 로드합니다.
-    preprocess_and_split.py 에서 생성된 파일을 사용합니다.
+    원본 raw 데이터를 로드하고 Stratified Split을 수행합니다.
+    CatBoost의 native categorical handling을 위해 raw string 상태를 유지합니다.
     """
-    train_x_path = os.path.join(DATA_DIR, "X_train_original.csv")
-    train_y_path = os.path.join(DATA_DIR, "y_train_original.csv")
-    test_x_path = os.path.join(DATA_DIR, "X_test.csv")
-    test_y_path = os.path.join(DATA_DIR, "y_test.csv")
+    print(f"데이터 로드 경로: {DATA_PATH}")
+    df = pd.read_csv(DATA_PATH)
     
-    print(f"데이터 로드 경로: {DATA_DIR}")
+    # 1. 최소한의 전처리: 이진(Binary) 변수만 0/1로 변환 (CatBoost도 가능하지만 명시적 변환 권장)
+    binary_map = {'yes': 1, 'no': 0}
+    df['international_plan'] = df['international_plan'].map(binary_map)
+    df['voice_mail_plan'] = df['voice_mail_plan'].map(binary_map)
+    df['churn'] = df['churn'].map(binary_map)
     
-    X_train = pd.read_csv(train_x_path)
-    y_train = pd.read_csv(train_y_path).values.ravel()
-    X_test = pd.read_csv(test_x_path)
-    y_test = pd.read_csv(test_y_path).values.ravel()
+    # 2. 피처와 타겟 분리
+    X = df.drop('churn', axis=1)
+    y = df['churn']
+    
+    # 3. Stratified Split (15% Test, 85% Train - 기존 프로젝트와 동일한 비율)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.15, stratify=y, random_state=RANDOM_STATE
+    )
+    
+    print(f"학습 데이터 크기: {X_train.shape}, 테스트 데이터 크기: {X_test.shape}")
     
     return X_train, y_train, X_test, y_test
 
@@ -71,6 +79,7 @@ class ModelOptimizer:
             'allow_writing_files': False,
             'eval_metric': 'F1',
             'cat_features': self.cat_features,
+            'auto_class_weights': 'Balanced', # 클래스 불균형 처리를 위한 가중치 추가
             'bagging_temperature': trial.suggest_float('bagging_temperature', 0.0, 1.0),
             'depth': trial.suggest_int('depth', 4, 10),
             'colsample_bylevel': trial.suggest_float('colsample_bylevel', 0.5, 1.0),
@@ -119,10 +128,11 @@ def get_trained_model():
     
     final_model = CatBoostClassifier(
         boosting_type='Ordered', bootstrap_type='Bayesian', 
-        iterations=1000, 
+        iterations=200, 
         random_state=RANDOM_STATE, verbose=0, 
         allow_writing_files=False, 
         cat_features=cat_features,
+        auto_class_weights='Balanced', # 최종 모델에도 불균형 가중치 적용
         **study.best_params
     )
     

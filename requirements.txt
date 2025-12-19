@@ -1,0 +1,11 @@
+streamlit
+pandas
+seaborn
+pickle5
+catboost
+plotly
+scikit-learn
+matplotlib
+numpy
+optuna
+pyyaml
