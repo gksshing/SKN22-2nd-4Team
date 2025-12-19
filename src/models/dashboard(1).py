@@ -132,7 +132,7 @@ if "KRW" in currency_option:
     exchange_factor = current_rate
     st.sidebar.success(f"현재 적용 환율: 1 USD = {current_rate:,.2f} KRW")
 else:
-    currency_symbol = int("$")
+    currency_symbol = "$"
     exchange_factor = 1.0
 
 # -----------------------------------------------------------------------------
