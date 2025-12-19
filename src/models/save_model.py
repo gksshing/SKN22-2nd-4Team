@@ -2,7 +2,7 @@ import os
 import pickle
 import pandas as pd
 from catboost import CatBoostClassifier
-from cb import get_trained_model, load_and_split_data
+from cb import get_trained_model, load_data
 
 # 현재 스크립트의 절대 경로를 기준으로 저장 경로 설정
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +26,7 @@ def save_model_and_features():
         
     # --- 추가: 평균값 계산 (이탈하지 않은 고객 기준) ---
     print("평균값(이탈 안 한 고객)을 계산합니다...")
-    X_train, y_train, _, _, _ = load_and_split_data()
+    X_train, y_train, _, _ = load_data()
     
     # 이탈하지 않은 고객(0)만 필터링
     # y_train이 Series라면 인덱스로 매칭
