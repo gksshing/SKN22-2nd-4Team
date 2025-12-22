@@ -102,7 +102,7 @@ if df is None:
 # -----------------------------------------------------------------------------
 st.sidebar.title("🛡️ Churn Diagnosis")
 st.sidebar.info("고객이탈 진단 및 방지 솔루션")
-page = st.sidebar.radio("MENU", ["1. 현황 진단", "2. 솔루션 & 시뮬레이션", "3. 기대 효과"])
+page = st.sidebar.radio("MENU", ["1. 현황 진단", "2. 시뮬레이션 & 솔루션", "3. 기대 효과"])
 
 st.sidebar.markdown("---")
 @st.cache_data
@@ -233,9 +233,9 @@ if page == "1. 현황 진단":
     """, unsafe_allow_html=True)
 
 
-# === Page 2: 솔루션 & 시뮬레이션 ===
-elif page == "2. 솔루션 & 시뮬레이션":
-    st.title("💊 3단계 이탈 방지 시뮬레이터")
+# === Page 2: 시뮬레이션 & 솔루션 ===
+elif page == "2. 시뮬레이션 & 솔루션":
+    st.title("💊 이탈 방지 시뮬레이션")
     st.markdown("각 원인별 맞춤형 전략을 수행했을 때, 회복 가능한 매출을 예측합니다.")
 
     col_simulator, col_results = st.columns([1, 1])
@@ -243,7 +243,7 @@ elif page == "2. 솔루션 & 시뮬레이션":
     # --- 1. 왼쪽: 시뮬레이터 조작 ---
     with col_simulator:
         st.markdown("### 🎛️ 전략별 방어율 설정")
-        st.info("각 전략 실행 시 예상되는 **이탈 방어 성공률(%)**을 조정하세요.")
+        st.info("각 전략 실행 시 예상되는 **이탈 방어 성공률**(%)을 조정하세요.")
         
         # Slider 1: CS
         st.markdown("**1️⃣ CS 불만 케어 프로그램**")
@@ -330,7 +330,7 @@ elif page == "2. 솔루션 & 시뮬레이션":
 
     # --- 3. 하단: Action Plan (3 Columns) ---
     st.markdown("---")
-    st.subheader("💡 3대 영역별 세부 실행 계획 (Action Plan)")
+    st.subheader("💡 3대 영역별 솔루션")
     
     col_act1, col_act2, col_act3 = st.columns(3)
     
@@ -357,7 +357,7 @@ elif page == "2. 솔루션 & 시뮬레이션":
 
 # === Page 3: 기대 효과 ===
 elif page == "3. 기대 효과":
-    st.title("📈 To-Be: 전략 도입 후 미래 예측")
+    st.title("📈 To-Be: 전략 도입 후 기대 효과")
     st.markdown("3가지 솔루션이 안착되었을 때 기대되는 회사의 연간 재무적 변화입니다.")
 
     # KPI 설정 (가정치)
@@ -392,7 +392,7 @@ elif page == "3. 기대 효과":
     st.markdown("---")
     st.markdown("""
     ### ✅ 경영진을 위한 제언 (Executive Summary)
-    1. **고객센터 불만**은 단순 응대가 아닌 **시스템적 방어(우선 배정)**가 필요합니다.
+    1. **고객센터 불만**은 단순 응대가 아닌 **프로액티브 케어**가 필요합니다.
     2. **국제전화 사용자**는 경쟁사로 넘어가기 가장 쉬운 그룹이므로 **가격 혜택**이 필수입니다.
     3. **주간 통화량이 많은 헤비 유저**는 우리 회사의 VIP이므로, **요금제 컨설팅**을 통해 락인(Lock-in) 해야 합니다.
     """)
